@@ -5,13 +5,21 @@ import { Card } from './Card';
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { api } from '../api/api';
 
-export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId }) {
+export function Column({ 
+  column, 
+  cards, 
+  onDelete, 
+  onUpdate, 
+  onMoveCard, 
+  onUpdateCard,  
+  boardId 
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [showAddCard, setShowAddCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardDescription, setNewCardDescription] = useState('');
-  const [isCreating, setIsCreating] = useState(false);  // ← Добавь
+  const [isCreating, setIsCreating] = useState(false);
 
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -29,7 +37,7 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
     if (!newCardTitle.trim() || isCreating) return;
     
     setIsCreating(true);
-    console.log('🟡 Создание карточки:', {
+    console.log('Создание карточки:', {
       columnId: column.id,
       title: newCardTitle,
       description: newCardDescription
@@ -41,9 +49,9 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
         description: newCardDescription,
       });
       
-      console.log('🟢 Карточка создана:', newCard);
+      console.log(' Карточка создана:', newCard);
       
-      // ✅ Добавляем карточку в список (без перезагрузки!)
+      // Добавляем карточку в список
       cards.push(newCard);
       
       // Очищаем форму
@@ -51,14 +59,13 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
       setNewCardDescription('');
       setShowAddCard(false);
       
-      // ✅ Обновляем родительский компонент через пропс
-      if (onMoveCard) {
-        // Просто вызываем обновление
-        onMoveCard(null, null, null);
+      // Обновляем родительский компонент
+      if (onUpdateCard) {
+        onUpdateCard();
       }
       
     } catch (err) {
-      console.log('🔴 Ошибка:', err);
+      console.log(' Ошибка:', err);
       alert('Failed to create card: ' + err.message);
     } finally {
       setIsCreating(false);
@@ -106,6 +113,7 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
               index={index}
               columnId={column.id}
               onMoveCard={onMoveCard}
+              onUpdateCard={onUpdateCard}  
             />
           ))}
         </SortableContext>

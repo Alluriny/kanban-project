@@ -28,19 +28,15 @@ export function CardModal({ card, onClose, onUpdate }) {
     }
   };
 
+
   const loadUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8000/users', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      }
+      // Используем api.getUsers() (работает с моком)
+      const data = await api.getUsers();
+      setUsers(data || []);
+      console.log(' Пользователи загружены:', data);
     } catch (err) {
-      console.error('Failed to load users');
+      console.log(' Failed to load users:', err);
     }
   };
 
@@ -51,7 +47,7 @@ export function CardModal({ card, onClose, onUpdate }) {
       onUpdate?.();
       onClose();
     } catch (err) {
-      alert('Failed to update card');
+      alert('Failed to update card: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -64,7 +60,7 @@ export function CardModal({ card, onClose, onUpdate }) {
       onUpdate?.();
       onClose();
     } catch (err) {
-      alert('Failed to delete card');
+      alert('Failed to delete card: ' + err.message);
     }
   };
 
@@ -75,7 +71,7 @@ export function CardModal({ card, onClose, onUpdate }) {
       setNewComment('');
       await loadComments();
     } catch (err) {
-      alert('Failed to add comment');
+      alert('Failed to add comment: ' + err.message);
     }
   };
 

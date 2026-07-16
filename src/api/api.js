@@ -14,26 +14,26 @@ let mockIdCounter = 100;
 // ===== MOCK AUTH =====
 const mockAuth = {
   register: async (login, password) => {
-    console.log('📝 Регистрация:', login, password);
+    console.log(' Регистрация:', login, password);
     const existing = mockUsers.find(u => u.login === login);
     if (existing) {
-      console.log('❌ Пользователь уже существует');
+      console.log(' Пользователь уже существует');
       throw new Error('Login already exists');
     }
     const newUser = { id: String(++mockIdCounter), login, password };
     mockUsers.push(newUser);
-    console.log('✅ Пользователь создан:', newUser);
+    console.log(' Пользователь создан:', newUser);
     return { access_token: 'mock_token_' + newUser.id, token_type: 'bearer' };
   },
   
   login: async (login, password) => {
-    console.log('🔑 Вход:', login, password);
+    console.log(' Вход:', login, password);
     const user = mockUsers.find(u => u.login === login && u.password === password);
     if (!user) {
-      console.log('❌ Неверные данные');
+      console.log(' Неверные данные');
       throw new Error('Invalid credentials');
     }
-    console.log('✅ Вход выполнен:', user);
+    console.log(' Вход выполнен:', user);
     return { access_token: 'mock_token_' + user.id, token_type: 'bearer' };
   }
 };
@@ -41,15 +41,14 @@ const mockAuth = {
 // ===== MOCK CRUD =====
 const mockCrud = {
   getBoards: async () => {
-    console.log('📋 Получение досок:', mockBoards);
+    console.log(' Получение досок:', mockBoards);
     return mockBoards;
   },
   
   createBoard: async (title) => {
-    // ✅ ЗАЩИТА ОТ ДУБЛИКАТОВ
     const lastBoard = mockBoards[mockBoards.length - 1];
     if (lastBoard && lastBoard.title === title) {
-      console.log('⚠️ Дубликат доски, пропускаем');
+      console.log(' Дубликат доски, пропускаем');
       return lastBoard;
     }
     
@@ -81,7 +80,17 @@ const mockCrud = {
   },
   
   getColumns: async (boardId) => {
-    return mockColumns.filter(c => c.boardId === boardId);
+    //  БЕРЁМ КАРТОЧКИ ИЗ mockCards
+    const columns = mockColumns
+      .filter(c => c.boardId === boardId)
+      .map(col => {
+        const cards = mockCards
+          .filter(c => c.columnId === col.id)
+          .sort((a, b) => a.order - b.order);
+        return { ...col, cards };
+      });
+    console.log(' getColumns возвращает:', columns);
+    return columns;
   },
   
   createColumn: async (boardId, title) => {
@@ -118,6 +127,7 @@ const mockCrud = {
       comments: []
     };
     mockCards.push(card);
+    console.log(' Создана карточка:', card);
     return card;
   },
   
@@ -133,16 +143,39 @@ const mockCrud = {
     return { success: true };
   },
   
+  // =====  moveCard =====
   moveCard: async (cardId, targetColumnId, newOrder) => {
+    console.log(' moveCard МОК:', { cardId, targetColumnId, newOrder });
+    
     const card = mockCards.find(c => c.id === cardId);
-    if (card) {
-      mockCards.filter(c => c.columnId === targetColumnId && c.order >= newOrder)
-        .forEach(c => c.order++);
-      card.columnId = targetColumnId;
-      card.order = newOrder;
-      return { success: true };
+    if (!card) {
+      console.log(' Карточка не найдена');
+      throw new Error('Card not found');
     }
-    throw new Error('Card not found');
+    
+    console.log(' Найдена карточка:', card);
+    
+    // Удаляем карточку из старой колонки
+    mockCards = mockCards.filter(c => c.id !== cardId);
+    
+    // Добавляем карточку в новую колонку
+    card.columnId = targetColumnId;
+    card.order = newOrder || 0;
+    mockCards.push(card);
+    
+    // Обновляем порядок карточек в колонке
+    const columnCards = mockCards
+      .filter(c => c.columnId === targetColumnId)
+      .sort((a, b) => a.order - b.order);
+    
+    columnCards.forEach((c, idx) => {
+      c.order = idx;
+    });
+    
+    console.log(' Карточка перемещена:', card);
+    console.log(' mockCards ПОСЛЕ:', JSON.parse(JSON.stringify(mockCards)));
+    
+    return { success: true };
   },
   
   addComment: async (cardId, text) => {
@@ -171,7 +204,7 @@ const mockCrud = {
 export const api = {
   // Auth
   register: async (login, password) => {
-    console.log('🟣 api.register вызван с:', login, password);
+    console.log(' api.register вызван с:', login, password);
     if (USE_MOCK) {
       return mockAuth.register(login, password);
     }
@@ -183,7 +216,7 @@ export const api = {
   },
 
   login: async (login, password) => {
-    console.log('🟣 api.login вызван с:', login, password);
+    console.log(' api.login вызван с:', login, password);
     if (USE_MOCK) {
       return mockAuth.login(login, password);
     }
@@ -253,6 +286,7 @@ export const api = {
   },
 
   moveCard: async (cardId, targetColumnId, newOrder) => {
+    console.log(' api.moveCard вызван:', { cardId, targetColumnId, newOrder });
     if (USE_MOCK) return mockCrud.moveCard(cardId, targetColumnId, newOrder);
     return authFetch(`/cards/${cardId}/move`, {
       method: 'PATCH',

@@ -1,6 +1,3 @@
-/* ============================================================
-   DARK THEME - KANBAN STYLE
-   ============================================================ */
 
 /* ===== RESET & BASE ===== */
 * {
@@ -57,9 +54,7 @@ body {
   color: #f85149;
 }
 
-/* ============================================================
-   LOGIN PAGE
-   ============================================================ */
+/* LOGIN PAGE*/
 .login-page {
   display: flex;
   justify-content: center;
@@ -181,9 +176,7 @@ body {
   border: 1px solid #3d1a1a;
 }
 
-/* ============================================================
-   BOARDS PAGE
-   ============================================================ */
+/* BOARDS PAGE*/
 .boards-page {
   padding: 32px 40px;
   max-width: 1400px;
@@ -303,9 +296,7 @@ body {
   width: 100%;
 }
 
-/* ============================================================
-   BOARD PAGE
-   ============================================================ */
+/* BOARD PAGE*/
 .board-page {
   padding: 24px 32px;
   height: 100vh;
@@ -357,9 +348,7 @@ body {
   align-items: flex-start;
 }
 
-/* ============================================================
-   COLUMN
-   ============================================================ */
+/*COLUMN*/
 .column {
   background: #161b22;
   border-radius: 12px;
@@ -448,9 +437,7 @@ body {
   min-height: 60px;
 }
 
-/* ============================================================
-   CARD
-   ============================================================ */
+/*CARD*/
 .card-item {
   background: #0d1117;
   border-radius: 8px;
@@ -523,9 +510,7 @@ body {
   color: #8b949e;
 }
 
-/* ============================================================
-   ADD BUTTON
-   ============================================================ */
+/* ADD BUTTON*/
 .add-button-wrapper {
   width: 100%;
 }
@@ -627,9 +612,7 @@ body {
   background: #21262d;
 }
 
-/* ============================================================
-   MODAL
-   ============================================================ */
+/* MODAL*/
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -757,9 +740,7 @@ body {
   background: #21262d;
 }
 
-/* ============================================================
-   COMMENTS
-   ============================================================ */
+/* COMMENTS*/
 .comments-section {
   margin-top: 20px;
   padding-top: 20px;
@@ -857,9 +838,7 @@ body {
   background: #4752c4;
 }
 
-/* ============================================================
-   ANIMATIONS
-   ============================================================ */
+/* ANIMATIONS*/
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -876,9 +855,7 @@ body {
   }
 }
 
-/* ============================================================
-   LOADING
-   ============================================================ */
+/*LOADING*/
 .loading-spinner {
   display: flex;
   justify-content: center;
@@ -900,9 +877,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
+/*RESPONSIVE*/
 @media (max-width: 768px) {
   .boards-page {
     padding: 16px;
@@ -934,4 +909,24 @@ body {
     gap: 12px;
     align-items: flex-start;
   }
+}
+.card-item {
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-item:active {
+  cursor: grabbing;
+}
+
+.card-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }

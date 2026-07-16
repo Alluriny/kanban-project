@@ -12,25 +12,25 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('🔵 ФОРМА ОТПРАВЛЕНА!', { login, password });
+    console.log(' ФОРМА ОТПРАВЛЕНА!', { login, password });
     setError('');
     setLoading(true);
 
     try {
-      console.log('🟣 Вызов API...');
+      console.log(' Вызов API...');
       const response = await (isLogin ? api.login : api.register)(login, password);
-      console.log('🟢 Ответ:', response);
+      console.log(' Ответ:', response);
       
       if (response.access_token) {
         localStorage.setItem('token', response.access_token);
         localStorage.setItem('userLogin', login);
-        console.log('✅ Токен сохранен, редирект...');
+        console.log(' Токен сохранен, редирект...');
         navigate('/boards');
       } else {
         setError(response.detail || 'Something went wrong');
       }
     } catch (err) {
-      console.log('🔴 Ошибка:', err);
+      console.log('Ошибка:', err);
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
