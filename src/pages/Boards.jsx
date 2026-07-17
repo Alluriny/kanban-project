@@ -68,7 +68,7 @@ function Boards() {
   return (
     <div className="boards-page">
       <div className="boards-header">
-        <h1>📋 Your Boards</h1>
+        <h1> Your Boards</h1>
         <div className="user-info">
           <div className="avatar">
             {getInitials(localStorage.getItem('userLogin') || 'U')}
