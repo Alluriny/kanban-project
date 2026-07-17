@@ -1,190 +1,83 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export const api = {
-  login: async (login, password) => {
-    console.log('✅ LOGIN CALLED:', login);
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login, password })
-    });
-    const data = await response.json();
-    console.log('✅ LOGIN RESPONSE:', data);
-    if (!response.ok) throw new Error(data.detail || 'Login failed');
-    return data;
-  },
-
   register: async (login, password) => {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const res = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ login, password })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || 'Registration failed');
-    return data;
+    if (!res.ok) throw new Error((await res.json()).detail || 'Registration failed');
+    return res.json();
   },
 
-  getBoards: async () => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/boards/`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  createBoard: async (title) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/boards/`, {
+  login: async (login, password) => {
+    const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ title })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password })
     });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
+    if (!res.ok) throw new Error((await res.json()).detail || 'Login failed');
+    return res.json();
   },
 
-  updateBoard: async (id, title, version) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/boards/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ title, version })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
+  getBoards: async () => authFetch('/boards/'),
+  createBoard: async (title) => authFetch('/boards/', { method: 'POST', body: title }),
+  updateBoard: async (id, title, version) => authFetch(`/boards/${id}`, { method: 'PATCH', body: { title, version } }),
+  deleteBoard: async (id) => authFetch(`/boards/${id}`, { method: 'DELETE' }),
 
-  deleteBoard: async (id) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/boards/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
+  getColumns: async (boardId) => authFetch(`/columns/board/${boardId}`),
+  createColumn: async (boardId, title) => authFetch(`/columns?board_id=${boardId}`, { method: 'POST', body: title }),
+  updateColumn: async (id, title) => authFetch(`/columns/${id}`, { method: 'PATCH', body: { title } }),
+  deleteColumn: async (id) => authFetch(`/columns/${id}`, { method: 'DELETE' }),
 
-  getColumns: async (boardId) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/columns/board/${boardId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  createColumn: async (boardId, title) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/columns?board_id=${boardId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ title })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  updateColumn: async (id, title) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/columns/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ title })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  deleteColumn: async (id) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/columns/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  getCards: async (columnId) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/cards/column/${columnId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  createCard: async (columnId, data) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/cards/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ ...data, column_id: columnId })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
+  getCards: async (columnId) => authFetch(`/cards/column/${columnId}`),
+  
+  // ✅ ИСПРАВЛЕНО: отправляем ТОЛЬКО изменяемые поля
+  createCard: async (columnId, data) => authFetch(`/cards/`, {
+    method: 'POST',
+    body: { ...data, column_id: columnId }
+  }),
+  
   updateCard: async (id, data) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/cards/${id}`, {
+    const cleanedData = {};
+    if (data.title !== undefined) cleanedData.title = data.title;
+    if (data.description !== undefined) cleanedData.description = data.description;
+    if (data.assigned_to !== undefined) cleanedData.assigned_to = data.assigned_to;
+    if (data.deadline !== undefined) cleanedData.deadline = data.deadline;
+    
+    return authFetch(`/cards/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(data)
+      body: cleanedData
     });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
   },
+  
+  deleteCard: async (id) => authFetch(`/cards/${id}`, { method: 'DELETE' }),
+  moveCard: async (cardId, targetColumnId, newOrder) => authFetch(`/cards/${cardId}/move`, {
+    method: 'PATCH',
+    body: { target_column_id: targetColumnId, new_order: newOrder }
+  }),
 
-  deleteCard: async (id) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/cards/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
+  addComment: async (cardId, text) => authFetch(`/comments?card_id=${cardId}`, { method: 'POST', body: { text } }),
+  getComments: async (cardId) => authFetch(`/comments/card/${cardId}`),
 
-  moveCard: async (cardId, targetColumnId, newOrder) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/cards/${cardId}/move`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ target_column_id: targetColumnId, new_order: newOrder })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
+  getUsers: async () => authFetch('/users')
+};
 
-  addComment: async (cardId, text) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/comments?card_id=${cardId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ text })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  getComments: async (cardId) => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/comments/card/${cardId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-
-  getUsers: async () => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_URL}/users`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
+const authFetch = async (url, options = {}) => {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_URL}${url}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || 'Request failed');
   }
+  return res.json();
 };

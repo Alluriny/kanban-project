@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/api';
-import { FiX, FiUser, FiCalendar, FiMessageCircle } from 'react-icons/fi';
 
 export function CardModal({ card, onClose, onUpdate }) {
   const [form, setForm] = useState({
@@ -28,26 +27,32 @@ export function CardModal({ card, onClose, onUpdate }) {
     }
   };
 
-
   const loadUsers = async () => {
     try {
-      // Используем api.getUsers() (работает с моком)
       const data = await api.getUsers();
       setUsers(data || []);
-      console.log(' Пользователи загружены:', data);
     } catch (err) {
-      console.log(' Failed to load users:', err);
+      console.error('Failed to load users');
     }
   };
 
   const handleSave = async () => {
     try {
       setLoading(true);
-      await api.updateCard(card.id, form);
+      
+      // ✅ ИСПРАВЛЕНО: преобразуем пустую строку в null
+      const dataToSend = {
+        title: form.title,
+        description: form.description,
+        assigned_to: form.assigned_to || null,
+        deadline: form.deadline || null,  // ← пустая строка → null
+      };
+      
+      await api.updateCard(card.id, dataToSend);
       onUpdate?.();
       onClose();
     } catch (err) {
-      alert('Failed to update card: ' + err.message);
+      alert('Failed to update card');
     } finally {
       setLoading(false);
     }
@@ -60,7 +65,7 @@ export function CardModal({ card, onClose, onUpdate }) {
       onUpdate?.();
       onClose();
     } catch (err) {
-      alert('Failed to delete card: ' + err.message);
+      alert('Failed to delete card');
     }
   };
 
@@ -71,19 +76,14 @@ export function CardModal({ card, onClose, onUpdate }) {
       setNewComment('');
       await loadComments();
     } catch (err) {
-      alert('Failed to add comment: ' + err.message);
+      alert('Failed to add comment');
     }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <h2>Edit Card</h2>
-          <button className="btn-icon" onClick={onClose}>
-            <FiX size={24} />
-          </button>
-        </div>
+        <h2>Edit Card</h2>
 
         <div className="form-group">
           <label>Title</label>
@@ -105,7 +105,7 @@ export function CardModal({ card, onClose, onUpdate }) {
         </div>
 
         <div className="form-group">
-          <label><FiUser /> Assignee</label>
+          <label>Assignee</label>
           <select
             value={form.assigned_to}
             onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
@@ -120,7 +120,7 @@ export function CardModal({ card, onClose, onUpdate }) {
         </div>
 
         <div className="form-group">
-          <label><FiCalendar /> Deadline</label>
+          <label>Deadline</label>
           <input
             type="date"
             value={form.deadline}
@@ -129,8 +129,8 @@ export function CardModal({ card, onClose, onUpdate }) {
         </div>
 
         <div className="comments-section">
-          <h4><FiMessageCircle /> Comments ({comments.length})</h4>
-          
+          <h4>Comments ({comments.length})</h4>
+
           <div className="comment-form">
             <input
               value={newComment}
@@ -143,9 +143,6 @@ export function CardModal({ card, onClose, onUpdate }) {
 
           {comments.map(comment => (
             <div key={comment.id} className="comment-item">
-              <div className="comment-avatar">
-                {comment.author?.login?.charAt(0).toUpperCase() || 'U'}
-              </div>
               <div className="comment-body">
                 <div className="comment-author">
                   {comment.author?.login || 'Unknown'}
@@ -160,12 +157,8 @@ export function CardModal({ card, onClose, onUpdate }) {
         </div>
 
         <div className="modal-actions">
-          <button className="delete" onClick={handleDelete}>
-            Delete
-          </button>
-          <button className="cancel" onClick={onClose}>
-            Cancel
-          </button>
+          <button className="delete" onClick={handleDelete}>Delete</button>
+          <button className="cancel" onClick={onClose}>Cancel</button>
           <button className="save" onClick={handleSave} disabled={loading}>
             {loading ? 'Saving...' : 'Save'}
           </button>

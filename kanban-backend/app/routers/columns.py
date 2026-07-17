@@ -1,14 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.models import User, Board, ColumnModel, board_participants
-from app.schemas import ColumnCreate, ColumnUpdate, ColumnResponse
+from app.schemas import ColumnUpdate, ColumnResponse
 from app.dependencies import get_current_user
+import json
 
 router = APIRouter(prefix="/columns", tags=["columns"])
 
-#ПОЛУЧИТЬ ВСЕ КОЛОНКИ ДОСКИ 
 @router.get("/board/{board_id}", response_model=List[ColumnResponse])
 def get_columns(
     board_id: str,
@@ -32,14 +32,28 @@ def get_columns(
     columns = db.query(ColumnModel).filter(ColumnModel.board_id == board_id).order_by(ColumnModel.order).all()
     return columns
 
-# СОЗДАТЬ КОЛОНКУ 
 @router.post("/", response_model=ColumnResponse)
-def create_column(
-    column: ColumnCreate,
-    board_id: str,
+async def create_column(
+    request: Request,
+    board_id: str = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    try:
+        body = await request.body()
+        data = json.loads(body)
+        
+        # Если пришла строка — используем её как title
+        if isinstance(data, str):
+            title = data
+        else:
+            title = data.get('title')
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid request body: {str(e)}")
+    
+    if not title:
+        raise HTTPException(status_code=422, detail="title is required")
+    
     board = db.query(Board).filter(Board.id == board_id).first()
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
@@ -54,11 +68,10 @@ def create_column(
         if not participant or participant.role not in ["admin", "member"]:
             raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    # Считаем количество колонок для order
     max_order = db.query(ColumnModel).filter(ColumnModel.board_id == board_id).count()
     
     new_column = ColumnModel(
-        title=column.title,
+        title=title,
         order=max_order + 1,
         board_id=board_id
     )
@@ -67,7 +80,6 @@ def create_column(
     db.refresh(new_column)
     return new_column
 
-#ОБНОВИТЬ КОЛОНКУ
 @router.patch("/{column_id}", response_model=ColumnResponse)
 def update_column(
     column_id: str,
@@ -95,7 +107,6 @@ def update_column(
     db.refresh(column)
     return column
 
-#УДАЛИТЬ КОЛОНКУ
 @router.delete("/{column_id}")
 def delete_column(
     column_id: str,

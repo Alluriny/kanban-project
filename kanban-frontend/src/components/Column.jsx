@@ -5,17 +5,18 @@ import { Card } from './Card';
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { api } from '../api/api';
 
-export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId }) {
+export function Column({ column, cards, onDelete, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [showAddCard, setShowAddCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardDescription, setNewCardDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isOver, setIsOver] = useState(false);
 
   const { setNodeRef } = useDroppable({
     id: column.id,
-    data: { columnId: column.id }
+    data: { columnId: column.id },
   });
 
   const handleUpdate = () => {
@@ -27,35 +28,32 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
 
   const handleAddCard = async () => {
     if (!newCardTitle.trim() || isCreating) return;
-    
     setIsCreating(true);
-    console.log('🟡 Создание карточки:', {
-      columnId: column.id,
-      title: newCardTitle,
-      description: newCardDescription
-    });
-
     try {
-      const newCard = await api.createCard(column.id, {
+      await api.createCard(column.id, {
         title: newCardTitle,
-        description: newCardDescription,
+        description: newCardDescription
       });
-      
-      console.log('🟢 Карточка создана:', newCard);
-      
-      // ✅ Добавляем карточку и перезагружаем страницу
+      setNewCardTitle('');
+      setNewCardDescription('');
+      setShowAddCard(false);
       window.location.reload();
-      
     } catch (err) {
-      console.log('🔴 Ошибка:', err);
       alert('Failed to create card: ' + err.message);
     } finally {
       setIsCreating(false);
     }
   };
 
+  const cardIds = cards.map(card => card.id);
+
   return (
-    <div className="column" ref={setNodeRef}>
+    <div 
+      className={`column ${isOver ? 'drop-over' : ''}`} 
+      ref={setNodeRef}
+      onMouseEnter={() => setIsOver(true)}
+      onMouseLeave={() => setIsOver(false)}
+    >
       <div className="column-header">
         {isEditing ? (
           <input
@@ -75,17 +73,23 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
           <button onClick={() => setIsEditing(true)}>
             <FiEdit2 size={14} />
           </button>
-          <button className="danger" onClick={() => onDelete(column.id)}>
+          <button 
+            className="danger" 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm('Delete this column?')) {
+                onDelete(column.id);
+              }
+            }}
+          >
             <FiTrash2 size={14} />
           </button>
         </div>
       </div>
 
-      <div className="card-count">{cards.length} cards</div>
-
       <div className="cards-list">
         <SortableContext
-          items={cards.map(c => c.id)}
+          items={cardIds}
           strategy={verticalListSortingStrategy}
         >
           {cards.map((card, index) => (
@@ -94,7 +98,6 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
               card={card}
               index={index}
               columnId={column.id}
-              onMoveCard={onMoveCard}
             />
           ))}
         </SortableContext>

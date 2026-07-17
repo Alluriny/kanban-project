@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app.models import User, Board, ColumnModel, Card, board_participants
-from app.schemas import CardUpdate, CardMove
+from app.schemas import CardCreate, CardUpdate, CardMove
 from app.dependencies import get_current_user
 from datetime import datetime
 import json
@@ -45,15 +45,11 @@ async def create_card(
     
     column_id = data.get('column_id') or data.get('columnId')
     if not column_id:
-        raise HTTPException(status_code=422, detail="column_id or columnId is required")
+        raise HTTPException(status_code=422, detail="column_id is required")
     
     title = data.get('title')
     if not title:
         raise HTTPException(status_code=422, detail="title is required")
-    
-    description = data.get('description')
-    assigned_to = data.get('assigned_to')
-    deadline = data.get('deadline')
     
     column = db.query(ColumnModel).filter(ColumnModel.id == column_id).first()
     if not column:
@@ -74,11 +70,11 @@ async def create_card(
     
     new_card = Card(
         title=title,
-        description=description,
+        description=data.get('description'),
         order=max_order + 1,
-        deadline=deadline,
+        deadline=data.get('deadline'),
         column_id=column_id,
-        assigned_to=assigned_to
+        assigned_to=data.get('assigned_to')
     )
     db.add(new_card)
     db.commit()
@@ -86,14 +82,15 @@ async def create_card(
     return new_card
 
 @router.patch("/{card_id}")
-def update_card(
+async def update_card(
     card_id: str,
-    card_data: CardUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if card_id == "null" or not card_id:
-        raise HTTPException(status_code=400, detail="Invalid card_id")
+    # Получаем тело запроса
+    body = await request.body()
+    data = json.loads(body)
     
     card = db.query(Card).filter(Card.id == card_id).first()
     if not card:
@@ -102,6 +99,7 @@ def update_card(
     column = db.query(ColumnModel).filter(ColumnModel.id == card.column_id).first()
     board = db.query(Board).filter(Board.id == column.board_id).first()
     
+    # Проверка прав
     if board.owner_id != current_user.id:
         participant = db.execute(
             board_participants.select().where(
@@ -113,14 +111,15 @@ def update_card(
             if card.assigned_to != current_user.id:
                 raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    if card_data.title is not None:
-        card.title = card_data.title
-    if card_data.description is not None:
-        card.description = card_data.description
-    if card_data.assigned_to is not None:
-        card.assigned_to = card_data.assigned_to
-    if card_data.deadline is not None:
-        card.deadline = card_data.deadline
+    # Обновляем только переданные поля
+    if 'title' in data:
+        card.title = data['title']
+    if 'description' in data:
+        card.description = data['description']
+    if 'assigned_to' in data:
+        card.assigned_to = data['assigned_to']
+    if 'deadline' in data:
+        card.deadline = data['deadline']
     
     db.commit()
     db.refresh(card)
@@ -132,9 +131,6 @@ def delete_card(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if card_id == "null" or not card_id:
-        raise HTTPException(status_code=400, detail="Invalid card_id")
-    
     card = db.query(Card).filter(Card.id == card_id).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
@@ -156,18 +152,6 @@ def delete_card(
     db.commit()
     return {"message": "Card deleted successfully"}
 
-# ============================================
-# РУЧКА ДЛЯ NULL (ВРЕМЕННО, ПОКА ФРОНТ НЕ ИСПРАВЯТ)
-# ============================================
-@router.patch("/null/move")
-def move_card_null(
-    move_data: CardMove,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Просто игнорируем запрос с null
-    return {"message": "Ignored move with null card_id", "status": "skipped"}
-
 @router.patch("/{card_id}/move")
 def move_card(
     card_id: str,
@@ -175,13 +159,6 @@ def move_card(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Проверка на null
-    if card_id == "null" or not card_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid card_id: card_id cannot be null"
-        )
-    
     card = db.query(Card).filter(Card.id == card_id).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
