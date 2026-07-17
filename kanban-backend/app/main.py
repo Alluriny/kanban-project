@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, boards, columns, cards, comments
+from app.routers import auth, boards, columns, cards, comments, users
 
 app = FastAPI(title="Kanban API", version="1.0")
 
@@ -17,6 +17,7 @@ app.include_router(boards.router)
 app.include_router(columns.router)
 app.include_router(cards.router)
 app.include_router(comments.router)
+app.include_router(users.router)
 
 @app.get("/")
 def root():

@@ -1,298 +1,190 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const USE_MOCK = true;
+const API_URL = 'http://localhost:8000';
 
-// ===== MOCK DATA =====
-let mockUsers = [
-  { id: '1', login: 'test', password: '123456' }
-];
-let mockBoards = [];
-let mockColumns = [];
-let mockCards = [];
-let mockComments = [];
-let mockIdCounter = 100;
-
-// ===== MOCK AUTH =====
-const mockAuth = {
-  register: async (login, password) => {
-    console.log('📝 Регистрация:', login, password);
-    const existing = mockUsers.find(u => u.login === login);
-    if (existing) {
-      console.log('❌ Пользователь уже существует');
-      throw new Error('Login already exists');
-    }
-    const newUser = { id: String(++mockIdCounter), login, password };
-    mockUsers.push(newUser);
-    console.log('✅ Пользователь создан:', newUser);
-    return { access_token: 'mock_token_' + newUser.id, token_type: 'bearer' };
-  },
-  
-  login: async (login, password) => {
-    console.log('🔑 Вход:', login, password);
-    const user = mockUsers.find(u => u.login === login && u.password === password);
-    if (!user) {
-      console.log('❌ Неверные данные');
-      throw new Error('Invalid credentials');
-    }
-    console.log('✅ Вход выполнен:', user);
-    return { access_token: 'mock_token_' + user.id, token_type: 'bearer' };
-  }
-};
-
-// ===== MOCK CRUD =====
-const mockCrud = {
-  getBoards: async () => {
-    console.log('📋 Получение досок:', mockBoards);
-    return mockBoards;
-  },
-  
-  createBoard: async (title) => {
-    // ✅ ЗАЩИТА ОТ ДУБЛИКАТОВ
-    const lastBoard = mockBoards[mockBoards.length - 1];
-    if (lastBoard && lastBoard.title === title) {
-      console.log('⚠️ Дубликат доски, пропускаем');
-      return lastBoard;
-    }
-    
-    const board = { 
-      id: String(++mockIdCounter), 
-      title, 
-      owner_id: '1',
-      created_at: new Date().toISOString(),
-      version: 0
-    };
-    mockBoards.push(board);
-    console.log('📋 Создана доска:', board);
-    return board;
-  },
-  
-  updateBoard: async (id, title, version) => {
-    const board = mockBoards.find(b => b.id === id);
-    if (board) {
-      board.title = title;
-      board.version = (board.version || 0) + 1;
-      return board;
-    }
-    throw new Error('Board not found');
-  },
-  
-  deleteBoard: async (id) => {
-    mockBoards = mockBoards.filter(b => b.id !== id);
-    return { success: true };
-  },
-  
-  getColumns: async (boardId) => {
-    return mockColumns.filter(c => c.boardId === boardId);
-  },
-  
-  createColumn: async (boardId, title) => {
-    const column = {
-      id: String(++mockIdCounter),
-      title,
-      boardId,
-      order: mockColumns.filter(c => c.boardId === boardId).length,
-      cards: []
-    };
-    mockColumns.push(column);
-    return column;
-  },
-  
-  updateColumn: async (id, title) => {
-    const col = mockColumns.find(c => c.id === id);
-    if (col) { col.title = title; return col; }
-    throw new Error('Column not found');
-  },
-  
-  deleteColumn: async (id) => {
-    mockColumns = mockColumns.filter(c => c.id !== id);
-    mockCards = mockCards.filter(c => c.columnId !== id);
-    return { success: true };
-  },
-  
-  createCard: async (columnId, data) => {
-    const card = {
-      id: String(++mockIdCounter),
-      ...data,
-      columnId,
-      order: mockCards.filter(c => c.columnId === columnId).length,
-      created_at: new Date().toISOString(),
-      comments: []
-    };
-    mockCards.push(card);
-    return card;
-  },
-  
-  updateCard: async (id, data) => {
-    const card = mockCards.find(c => c.id === id);
-    if (card) { Object.assign(card, data); return card; }
-    throw new Error('Card not found');
-  },
-  
-  deleteCard: async (id) => {
-    mockCards = mockCards.filter(c => c.id !== id);
-    mockComments = mockComments.filter(c => c.cardId !== id);
-    return { success: true };
-  },
-  
-  moveCard: async (cardId, targetColumnId, newOrder) => {
-    const card = mockCards.find(c => c.id === cardId);
-    if (card) {
-      mockCards.filter(c => c.columnId === targetColumnId && c.order >= newOrder)
-        .forEach(c => c.order++);
-      card.columnId = targetColumnId;
-      card.order = newOrder;
-      return { success: true };
-    }
-    throw new Error('Card not found');
-  },
-  
-  addComment: async (cardId, text) => {
-    const comment = {
-      id: String(++mockIdCounter),
-      text,
-      cardId,
-      authorId: '1',
-      author: { id: '1', login: 'test' },
-      created_at: new Date().toISOString()
-    };
-    mockComments.push(comment);
-    return comment;
-  },
-  
-  getComments: async (cardId) => {
-    return mockComments.filter(c => c.cardId === cardId);
-  },
-  
-  getUsers: async () => {
-    return mockUsers.map(u => ({ id: u.id, login: u.login }));
-  }
-};
-
-// ===== ОСНОВНОЙ API =====
 export const api = {
-  // Auth
-  register: async (login, password) => {
-    console.log('🟣 api.register вызван с:', login, password);
-    if (USE_MOCK) {
-      return mockAuth.register(login, password);
-    }
-    return fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login, password })
-    }).then(r => r.json());
-  },
-
   login: async (login, password) => {
-    console.log('🟣 api.login вызван с:', login, password);
-    if (USE_MOCK) {
-      return mockAuth.login(login, password);
-    }
-    return fetch(`${API_URL}/auth/login`, {
+    console.log('✅ LOGIN CALLED:', login);
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ login, password })
-    }).then(r => r.json());
+    });
+    const data = await response.json();
+    console.log('✅ LOGIN RESPONSE:', data);
+    if (!response.ok) throw new Error(data.detail || 'Login failed');
+    return data;
   },
 
-  // Boards
-  getBoards: async () => {
-    if (USE_MOCK) return mockCrud.getBoards();
-    return authFetch('/boards');
+  register: async (login, password) => {
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Registration failed');
+    return data;
   },
-  
+
+  getBoards: async () => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/boards/`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+
   createBoard: async (title) => {
-    if (USE_MOCK) return mockCrud.createBoard(title);
-    return authFetch('/boards', { method: 'POST', body: { title } });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/boards/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ title })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   updateBoard: async (id, title, version) => {
-    if (USE_MOCK) return mockCrud.updateBoard(id, title, version);
-    return authFetch(`/boards/${id}`, { method: 'PATCH', body: { title, version } });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/boards/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ title, version })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   deleteBoard: async (id) => {
-    if (USE_MOCK) return mockCrud.deleteBoard(id);
-    return authFetch(`/boards/${id}`, { method: 'DELETE' });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/boards/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
-  // Columns
   getColumns: async (boardId) => {
-    if (USE_MOCK) return mockCrud.getColumns(boardId);
-    return authFetch(`/boards/${boardId}/columns`);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/columns/board/${boardId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   createColumn: async (boardId, title) => {
-    if (USE_MOCK) return mockCrud.createColumn(boardId, title);
-    return authFetch(`/boards/${boardId}/columns`, { method: 'POST', body: { title } });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/columns?board_id=${boardId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ title })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   updateColumn: async (id, title) => {
-    if (USE_MOCK) return mockCrud.updateColumn(id, title);
-    return authFetch(`/columns/${id}`, { method: 'PATCH', body: { title } });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/columns/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ title })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   deleteColumn: async (id) => {
-    if (USE_MOCK) return mockCrud.deleteColumn(id);
-    return authFetch(`/columns/${id}`, { method: 'DELETE' });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/columns/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
-  // Cards
+  getCards: async (columnId) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/cards/column/${columnId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+
   createCard: async (columnId, data) => {
-    if (USE_MOCK) return mockCrud.createCard(columnId, data);
-    return authFetch(`/columns/${columnId}/cards`, { method: 'POST', body: data });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/cards/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ ...data, column_id: columnId })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   updateCard: async (id, data) => {
-    if (USE_MOCK) return mockCrud.updateCard(id, data);
-    return authFetch(`/cards/${id}`, { method: 'PATCH', body: data });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/cards/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   deleteCard: async (id) => {
-    if (USE_MOCK) return mockCrud.deleteCard(id);
-    return authFetch(`/cards/${id}`, { method: 'DELETE' });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/cards/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   moveCard: async (cardId, targetColumnId, newOrder) => {
-    if (USE_MOCK) return mockCrud.moveCard(cardId, targetColumnId, newOrder);
-    return authFetch(`/cards/${cardId}/move`, {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/cards/${cardId}/move`, {
       method: 'PATCH',
-      body: { target_column_id: targetColumnId, new_order: newOrder }
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ target_column_id: targetColumnId, new_order: newOrder })
     });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
-  // Comments
   addComment: async (cardId, text) => {
-    if (USE_MOCK) return mockCrud.addComment(cardId, text);
-    return authFetch(`/cards/${cardId}/comments`, { method: 'POST', body: { text } });
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/comments?card_id=${cardId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ text })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
   getComments: async (cardId) => {
-    if (USE_MOCK) return mockCrud.getComments(cardId);
-    return authFetch(`/cards/${cardId}/comments`);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/comments/card/${cardId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   },
 
-  // Users
   getUsers: async () => {
-    if (USE_MOCK) return mockCrud.getUsers();
-    return authFetch('/users');
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/users`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
   }
-};
-
-// Helper для авторизованных запросов (реальный бэк)
-const authFetch = async (url, options = {}) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_URL}${url}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || 'Request failed');
-  }
-  return response.json();
 };

@@ -11,7 +11,7 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
   const [showAddCard, setShowAddCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardDescription, setNewCardDescription] = useState('');
-  const [isCreating, setIsCreating] = useState(false);  // ← Добавь
+  const [isCreating, setIsCreating] = useState(false);
 
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -43,19 +43,8 @@ export function Column({ column, cards, onDelete, onUpdate, onMoveCard, boardId 
       
       console.log('🟢 Карточка создана:', newCard);
       
-      // ✅ Добавляем карточку в список (без перезагрузки!)
-      cards.push(newCard);
-      
-      // Очищаем форму
-      setNewCardTitle('');
-      setNewCardDescription('');
-      setShowAddCard(false);
-      
-      // ✅ Обновляем родительский компонент через пропс
-      if (onMoveCard) {
-        // Просто вызываем обновление
-        onMoveCard(null, null, null);
-      }
+      // ✅ Добавляем карточку и перезагружаем страницу
+      window.location.reload();
       
     } catch (err) {
       console.log('🔴 Ошибка:', err);

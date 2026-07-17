@@ -1,141 +1,165 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../api/api';
+import { useParams } from 'react-router-dom';
+import { DndContext, closestCorners } from '@dnd-kit/core';
 import { Column } from '../components/Column';
-import { FiArrowLeft, FiPlus } from 'react-icons/fi';
+import { api } from '../api/api';
 
 function Board() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [board, setBoard] = useState(null);
-  const [columns, setColumns] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddColumn, setShowAddColumn] = useState(false);
-  const [newColumnTitle, setNewColumnTitle] = useState('');
+    const { id } = useParams();
+    const [columns, setColumns] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  const loadBoard = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getBoards(); // Получаем все доски
-      const found = data.find(b => b.id === id);
-      if (found) {
-        setBoard(found);
-        // Загружаем колонки (если есть отдельный эндпоинт)
-        // Или можно получить из данных
-        const columnsData = await api.getColumns(id);
-        setColumns(columnsData || []);
-      } else {
-        navigate('/boards');
-      }
-    } catch (err) {
-      navigate('/boards');
-    } finally {
-      setLoading(false);
-    }
-  };
+    useEffect(() => {
+        loadBoard();
+    }, [id]);
 
-  useEffect(() => {
-    loadBoard();
-  }, [id]);
+    const loadBoard = async () => {
+        try {
+            setLoading(true);
+            const columnsData = await api.getColumns(id);
+            const columnsWithCards = await Promise.all(
+                columnsData.map(async (column) => {
+                    const cards = await api.getCards(column.id);
+                    return { ...column, cards };
+                })
+            );
+            setColumns(columnsWithCards);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const handleAddColumn = async () => {
-    if (!newColumnTitle.trim()) return;
-    try {
-      const column = await api.createColumn(id, newColumnTitle);
-      setColumns([...columns, column]);
-      setNewColumnTitle('');
-      setShowAddColumn(false);
-    } catch (err) {
-      alert('Failed to create column');
-    }
-  };
+    const handleCreateCard = async (columnId, title, description) => {
+        try {
+            const newCard = await api.createCard(columnId, { title, description });
+            setColumns(prev => prev.map(col => {
+                if (col.id === columnId) {
+                    return { ...col, cards: [...col.cards, newCard] };
+                }
+                return col;
+            }));
+            return newCard;
+        } catch (err) {
+            console.error('Ошибка создания карточки:', err);
+            throw err;
+        }
+    };
 
-  const handleDeleteColumn = async (columnId) => {
-    if (!window.confirm('Delete this column and all cards?')) return;
-    try {
-      await api.deleteColumn(columnId);
-      setColumns(columns.filter(c => c.id !== columnId));
-    } catch (err) {
-      alert('Failed to delete column');
-    }
-  };
+    const handleMoveCard = async (cardId, targetColumnId, newOrder) => {
+        if (!cardId || cardId === 'null') {
+            console.warn('Move skipped: cardId is', cardId);
+            return;
+        }
 
-  const handleUpdateColumn = async (columnId, title) => {
-    try {
-      const updated = await api.updateColumn(columnId, title);
-      setColumns(columns.map(c => c.id === columnId ? updated : c));
-    } catch (err) {
-      alert('Failed to update column');
-    }
-  };
+        let sourceColumnId = null;
+        let cardData = null;
+        for (const col of columns) {
+            const found = col.cards.find(c => c.id === cardId);
+            if (found) {
+                sourceColumnId = col.id;
+                cardData = found;
+                break;
+            }
+        }
 
-  const handleMoveCard = async (cardId, targetColumnId, newOrder) => {
-    try {
-      await api.moveCard(cardId, targetColumnId, newOrder);
-      // Обновляем локальное состояние
-      const updatedColumns = await api.getColumns(id);
-      setColumns(updatedColumns);
-    } catch (err) {
-      alert('Failed to move card');
-    }
-  };
+        if (!sourceColumnId || !cardData) return;
 
-  if (loading) {
+        const oldColumns = [...columns];
+
+        try {
+            setColumns(prev => {
+                const newColumns = prev.map(col => {
+                    if (col.id === sourceColumnId) {
+                        return { ...col, cards: col.cards.filter(c => c.id !== cardId) };
+                    }
+                    if (col.id === targetColumnId) {
+                        const newCards = [...col.cards];
+                        newCards.splice(newOrder, 0, { ...cardData, column_id: targetColumnId });
+                        return { ...col, cards: newCards };
+                    }
+                    return col;
+                });
+                return newColumns;
+            });
+
+            await api.moveCard(cardId, targetColumnId, newOrder);
+        } catch (err) {
+            setColumns(oldColumns);
+            console.error('Ошибка перемещения:', err);
+        }
+    };
+
+    const handleCreateColumn = async (title) => {
+        try {
+            const newColumn = await api.createColumn(id, { title });
+            setColumns(prev => [...prev, { ...newColumn, cards: [] }]);
+        } catch (err) {
+            console.error('Ошибка создания колонки:', err);
+        }
+    };
+
+    const handleDeleteColumn = async (columnId) => {
+        try {
+            await api.deleteColumn(columnId);
+            setColumns(prev => prev.filter(col => col.id !== columnId));
+        } catch (err) {
+            console.error('Ошибка удаления колонки:', err);
+        }
+    };
+
+    if (loading) return <div className="loading">Загрузка...</div>;
+    if (error) return <div className="error">Ошибка: {error}</div>;
+
     return (
-      <div className="loading-spinner">
-        <div className="spinner" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="board-page">
-      <div className="board-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button className="back-btn" onClick={() => navigate('/boards')}>
-            <FiArrowLeft /> Back
-          </button>
-          <h2>{board?.title || 'Board'}</h2>
-        </div>
-      </div>
-
-      <div className="columns-container">
-        {columns.map((column) => (
-          <Column
-            key={column.id}
-            column={column}
-            cards={column.cards || []}
-            onDelete={handleDeleteColumn}
-            onUpdate={handleUpdateColumn}
-            onMoveCard={handleMoveCard}
-            boardId={id}
-          />
-        ))}
-
-        <div className="column" style={{ background: 'transparent', padding: '0' }}>
-          {showAddColumn ? (
-            <div className="add-button-form">
-              <input
-                value={newColumnTitle}
-                onChange={(e) => setNewColumnTitle(e.target.value)}
-                placeholder="Enter column name..."
-                onKeyDown={(e) => e.key === 'Enter' && handleAddColumn()}
-                autoFocus
-              />
-              <div className="form-actions">
-                <button className="save" onClick={handleAddColumn}>Add</button>
-                <button className="cancel" onClick={() => setShowAddColumn(false)}>Cancel</button>
-              </div>
+        <div className="board-container">
+            <div className="board-header">
+                <h1>Доска</h1>
+                <button 
+                    className="btn-add-column"
+                    onClick={() => {
+                        const title = prompt('Введите название колонки:');
+                        if (title) handleCreateColumn(title);
+                    }}
+                >
+                    + Добавить колонку
+                </button>
             </div>
-          ) : (
-            <button className="add-button" onClick={() => setShowAddColumn(true)}>
-              <FiPlus /> Add Column
-            </button>
-          )}
+
+            <DndContext
+                collisionDetection={closestCorners}
+                onDragEnd={(event) => {
+                    const { active, over } = event;
+                    if (!over) return;
+
+                    const cardId = active.id;
+                    const targetColumnId = over.data.current?.columnId;
+                    const newOrder = over.data.current?.index;
+
+                    if (cardId && cardId !== 'null' && targetColumnId !== undefined) {
+                        handleMoveCard(cardId, targetColumnId, newOrder);
+                    } else {
+                        console.warn('Move skipped: invalid data', { cardId, targetColumnId });
+                    }
+                }}
+            >
+                <div className="columns-container">
+                    {columns.map((column) => (
+                        <Column
+                            key={column.id}
+                            column={column}
+                            cards={column.cards || []}
+                            onMoveCard={handleMoveCard}
+                            onCreateCard={handleCreateCard}
+                            onDeleteColumn={handleDeleteColumn}
+                        />
+                    ))}
+                </div>
+            </DndContext>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default Board;
